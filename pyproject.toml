@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "zendesk-macro-doctor"
+version = "1.0.0"
+description = "Audit a Zendesk macros CSV export for unused, duplicated, and stale macros"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.9"
+
+[project.scripts]
+zendesk-macro-doctor = "zendesk_macro_doctor:main_entry"
+
+[tool.setuptools]
+py-modules = ["zendesk_macro_doctor"]

@@ -1,0 +1,27 @@
+macro_id,title,category,actions,last_used_at,use_count,status,updated_at,comment_text
+M-101,Reset password help,Account,comment: Follow the steps below to reset your password; set field: issue_type=password_reset; add tag: password_reset,2026-11-10,42,active,2026-11-01,Follow the steps below to reset your password at https://help.example.com/reset-password
+M-102,Reset Password Help,Account,comment: Follow the steps below to reset your password; set field: issue_type=password_reset; add tag: password_reset,2026-11-12,38,active,2026-11-02,Follow the steps below to reset your password at https://help.example.com/reset-password
+M-103,Refund request,Billing,comment: We can refund your order within 5 business days; set field: issue_type=refund,2026-08-01,12,active,2026-08-01,We can refund your order within 5 business days
+M-104,Pro plan price question,Billing,comment: Our Pro plan is $29 per month; set field: issue_type=pricing; add tag: pricing,2026-11-15,25,active,2026-11-01,"Our Pro plan is $29 per month, billed monthly"
+M-105,Old help center link,General,comment: See the guide at https://old-help.example.com/guide for details; set field: issue_type=general; add tag: help,2026-11-14,8,active,2026-11-03,See the guide at https://old-help.example.com/guide for details
+M-106,Empty macro,General,,2026-11-16,3,active,2026-11-04,
+M-107,Assign to old team,Support,comment: Escalating this to the legacy team; assign to group: Legacy Support; set field: issue_type=escalation; add tag: escalation,2026-11-17,15,active,2026-11-05,Escalating this to the legacy team
+M-108,No category macro,,comment: Thanks for reaching out; set field: issue_type=general; add tag: thanks,2026-11-13,20,active,2026-11-06,Thanks for reaching out
+M-109,Refund status check,Billing,comment: We can refund your order within 5 business days; set field: issue_type=refund; add tag: refund,2026-11-11,30,active,2026-11-07,We can refund your order within 5 business days
+M-110,Welcome new user,Onboarding,comment: Welcome aboard; set field: issue_type=onboarding; add tag: welcome,2026-11-09,55,active,2026-11-08,"Welcome aboard, thanks for joining us"
+M-111,VPN setup guide,Technical,comment: Install the VPN client from the link; add tag: vpn,2026-11-05,4,active,2026-11-09,Install the VPN client from the link below
+M-112,Broken link macro,General,comment: See the guide at https://help for details; set field: issue_type=general; add tag: help,2026-11-14,6,active,2026-11-10,See the guide at https://help for details
+M-113,Retired macro,Account,comment: Old password flow; set field: issue_type=password_reset; add tag: password_reset,2026-01-15,0,inactive,2026-01-15,"Old password flow, do not use"
+M-114,Never used macro,General,comment: A new macro nobody used yet; set field: issue_type=general; add tag: new,,0,active,2026-11-11,A new macro nobody used yet
+M-115,Future use macro,Technical,comment: Updated for the new release; set field: issue_type=general; add tag: release,2026-12-01,5,active,2026-11-12,Updated for the new release
+M-101,Reset password help,Account,comment: Follow the steps below to reset your password; set field: issue_type=password_reset; add tag: password_reset,2026-11-12,38,active,2026-11-02,Follow the steps below to reset your password at https://help.example.com/reset-password
+M-117,Bad count macro,General,comment: Something; set field: issue_type=general; add tag: x,2026-11-16,many,active,2026-11-13,Something
+M-118,Bad date macro,General,comment: Something else; set field: issue_type=general; add tag: x,not-a-date,7,active,2026-11-14,Something else
+M-119,BADROW,111
+M-120,Check order status,Orders,comment: Your order is on its way; set field: issue_type=order_status; add tag: order_status,2026-11-18,60,active,2026-11-15,"Your order is on its way, tracking to follow"
+M-121,Assign to departed agent,Support,comment: Passing this to Dana; assign to agent: Dana Cole; set field: issue_type=escalation; add tag: escalation,2026-11-16,9,active,2026-11-16,Passing this to Dana for a closer look
+M-122,Refund-Request!,Billing,comment: A refund takes 5 business days; set field: issue_type=refund; add tag: refund,2026-11-10,11,active,2026-11-17,A refund takes 5 business days to reach your account
+M-123,Basic plan price question,Billing,comment: Our Basic plan is $19 per month; set field: issue_type=pricing; add tag: pricing,2026-11-15,22,active,2026-11-18,"Our Basic plan is $19 per month, billed monthly"
+M-124,Shipping delay apology,Orders,comment: Sorry for the delay; add tag: shipping,2026-10-20,2,active,2026-10-20,Sorry for the delay with your order
+M-125,Missing last used,General,comment: Follow up on your ticket; set field: issue_type=general; add tag: followup,,9,active,2026-11-18,Follow up on your ticket soon
+M-126,,General,comment: No title here; set field: issue_type=general; add tag: x,2026-11-16,1,active,2026-11-18,No title here

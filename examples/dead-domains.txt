@@ -1,0 +1,3 @@
+# Domains that no longer serve help content
+old-help.example.com
+legacy.example.com

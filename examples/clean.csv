@@ -1,0 +1,5 @@
+macro_id,title,category,actions,last_used_at,use_count,status,updated_at,comment_text
+C-201,Reset password help,Account,comment: Follow the steps to reset your password; set field: issue_type=password_reset; add tag: password_reset,2026-11-10,42,active,2026-11-01,Follow the steps to reset your password at https://help.example.com/reset-password
+C-202,Check order status,Orders,comment: Your order is on its way; set field: issue_type=order_status; add tag: order_status,2026-11-12,30,active,2026-11-02,Your order is on its way
+C-203,Welcome new user,Onboarding,comment: Welcome aboard; set field: issue_type=onboarding; add tag: welcome,2026-11-15,55,active,2026-11-03,"Welcome aboard, thanks for joining us"
+C-204,Billing question,Billing,comment: Your invoice is attached; set field: issue_type=billing; add tag: billing,2026-11-17,12,active,2026-11-04,Your invoice is attached

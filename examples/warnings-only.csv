@@ -1,0 +1,3 @@
+macro_id,title,category,actions,last_used_at,use_count,status,updated_at,comment_text
+W-301,VPN setup guide,Technical,comment: Install the VPN client; add tag: vpn,2026-11-05,4,active,2026-11-09,Install the VPN client from the link below
+W-302,No category macro,,comment: Thanks for reaching out; set field: issue_type=general; add tag: thanks,2026-11-13,20,active,2026-11-06,Thanks for reaching out

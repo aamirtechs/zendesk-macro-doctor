@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zendesk Macro Doctor - AamirTechs</title>
+<style>
+:root{--navy:#0b1f3a;--gold:#d4a72c;--bg:#f6f8fb;--ink:#1c2733;--muted:#5b6b7c;--line:#d9e1ea}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;background:var(--bg);color:var(--ink)}
+header{background:var(--navy);color:#fff;padding:28px 20px;border-bottom:4px solid var(--gold)}
+header .wrap{max-width:880px;margin:0 auto}
+header h1{margin:0 0 6px;font-size:1.6rem}
+header p{margin:0;color:#c8d4e4}
+main{max-width:880px;margin:24px auto;padding:0 20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:20px;box-shadow:0 1px 3px rgba(11,31,58,.08)}
+label{display:block;font-weight:600;margin:14px 0 6px}
+.card>label:first-child{margin-top:0}
+textarea{width:100%;min-height:180px;padding:10px;border:1px solid var(--line);border-radius:8px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.85rem}
+textarea.small{min-height:90px}
+input[type=text],input[type=number],select{padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:.95rem;width:100%}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:4px}
+.grid label{margin:0 0 6px}
+.row{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
+button{background:var(--navy);color:#fff;border:0;border-radius:8px;padding:10px 18px;font-size:.95rem;cursor:pointer}
+button.alt{background:#fff;color:var(--navy);border:1px solid var(--navy)}
+button.gold{background:var(--gold);color:#0b1f3a;font-weight:600}
+pre{background:#0b1f3a;color:#eef3f9;border-radius:8px;padding:16px;overflow-x:auto;white-space:pre-wrap;word-break:break-word;min-height:60px;font-size:.85rem}
+footer{max-width:880px;margin:0 auto 32px;padding:0 20px;color:var(--muted);font-size:.9rem}
+footer a{color:var(--navy)}
+.hint{color:var(--muted);font-size:.85rem;margin-top:6px;font-weight:400}
+</style>
+</head>
+<body>
+<header><div class="wrap"><h1>Zendesk Macro Doctor</h1><p>Audit a Zendesk macros CSV export for unused, duplicated, and stale macros.</p></div></header>
+<main><div class="card">
+<label for="file">Input CSV file</label>
+<input type="file" id="file" accept=".csv,text/csv">
+<label for="input">Or paste the macros CSV</label>
+<textarea id="input" spellcheck="false" placeholder="Paste a Zendesk macros CSV export here, or load the sample."></textarea>
+<label for="prices-file">Current prices CSV file <span class="hint">(--prices-file, optional)</span></label>
+<input type="file" id="prices-file" accept=".csv,text/csv">
+<label for="prices">Or paste the prices CSV <span class="hint">(product,price; leave blank to skip stale price checks)</span></label>
+<textarea id="prices" class="small" spellcheck="false" placeholder="product,price"></textarea>
+<label for="deleted-file">Deleted groups and agents file <span class="hint">(--deleted-file, optional)</span></label>
+<input type="file" id="deleted-file" accept=".txt,text/plain">
+<label for="deleted">Or paste deleted names <span class="hint">(one per line; leave blank to skip)</span></label>
+<textarea id="deleted" class="small" spellcheck="false" placeholder="One deleted group or agent name per line"></textarea>
+<label for="dead-file">Dead domains file <span class="hint">(--dead-domains-file, optional)</span></label>
+<input type="file" id="dead-file" accept=".txt,text/plain">
+<label for="dead">Or paste dead domains <span class="hint">(one per line; leave blank to skip)</span></label>
+<textarea id="dead" class="small" spellcheck="false" placeholder="One dead domain per line"></textarea>
+<label>Options</label>
+<div class="grid">
+<div><label for="opt-unused">Unused days <span class="hint">(--unused-days)</span></label><input type="number" id="opt-unused" step="1" value="90"></div>
+<div><label for="opt-minuses">Min uses <span class="hint">(--min-uses)</span></label><input type="number" id="opt-minuses" step="1" value="5"></div>
+<div><label for="opt-asof">As of date <span class="hint">(--as-of, blank means now)</span></label><input type="text" id="opt-asof" placeholder="2026-11-18"></div>
+</div>
+<div class="row"><button class="gold" id="run" type="button">Run check</button><button class="alt" id="sample" type="button">Load sample</button><button class="alt" id="download" type="button">Download report</button></div>
+<label for="out">Report</label>
+<pre id="out">Your report will appear here.</pre>
+</div></main>
+<footer>
+<p>Built by AamirTechs. <a href="https://aamirtechs.github.io/">All tools</a> | <a href="https://github.com/aamirtechs/zendesk-macro-doctor">Source</a></p>
+<p>Privacy: this tool runs 100% in your browser, nothing is uploaded.</p>
+</footer>
+<script id="core">
+// Pure logic port of zendesk_macro_doctor.py. No DOM access in this block.
+function Dec(v) {
+  if (v && typeof v === "object" && typeof v.c === "bigint") return v;
+  var s = String(v).trim();
+  var m = /^([+-]?)(?:(\d+)(?:\.(\d*))?|\.(\d+))(?:[eE]([+-]?\d+))?$/.exec(s);
+  if (!m) throw new Error("not a number: " + s);
+  var intPart = m[2] || "";
+  var fracPart = (m[3] !== undefined ? m[3] : (m[4] || ""));
+  var exp = (m[5] ? parseInt(m[5], 10) : 0) - fracPart.length;
+  var digits = (intPart + fracPart).replace(/^0+/, "");
+  if (digits === "") return { c: 0n, e: exp };
+  var c = BigInt(digits);
+  if (m[1] === "-") c = -c;
+  return { c: c, e: exp };
+}
+function decStr(d) {
+  if (d.c === 0n) {
+    if (d.e >= 0) return "0" + "0".repeat(d.e);
+    var z = "0.";
+    for (var i = 0; i < -d.e - 1; i++) z += "0";
+    return z + "0";
+  }
+  var neg = d.c < 0n;
+  var digits = (neg ? -d.c : d.c).toString();
+  var out;
+  if (d.e >= 0) out = digits + "0".repeat(d.e);
+  else {
+    var pos = digits.length + d.e;
+    if (pos > 0) out = digits.slice(0, pos) + "." + digits.slice(pos);
+    else out = "0." + "0".repeat(-pos) + digits;
+  }
+  return (neg ? "-" : "") + out;
+}
+function decSub(a, b) {
+  var e = Math.min(a.e, b.e);
+  var ca = a.c * (10n ** BigInt(a.e - e));
+  var cb = b.c * (10n ** BigInt(b.e - e));
+  return { c: ca - cb, e: e };
+}
+function decCmp(a, b) {
+  var d = decSub(a, b);
+  return d.c < 0n ? -1 : (d.c > 0n ? 1 : 0);
+}
+function decQuantize2(a) {
+  if (a.e === -2) return { c: a.c, e: -2 };
+  if (a.e > -2) return { c: a.c * (10n ** BigInt(a.e + 2)), e: -2 };
+  var div = 10n ** BigInt(-2 - a.e);
+  var neg = a.c < 0n;
+  var abs = neg ? -a.c : a.c;
+  var q = abs / div;
+  var r = abs % div;
+  if (r * 2n > div || (r * 2n === div && (q & 1n) === 1n)) q += 1n;
+  return { c: neg ? -q : q, e: -2 };
+}
+function fmt2(v) { return decStr(decQuantize2(v)); }
+function pyRepr(v) {
+  if (v === null || v === undefined) return "None";
+  if (typeof v === "string") {
+    var esc = v.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t");
+    if (v.indexOf("'") >= 0 && v.indexOf('"') < 0) return '"' + esc + '"';
+    return "'" + esc.replace(/'/g, "\\'") + "'";
+  }
+  return String(v);
+}
+function parseCsvRows(text) {
+  var rows = [], row = [], field = "", inQuotes = false, i, ch;
+  text = String(text).replace(/^\uFEFF/, "");
+  for (i = 0; i < text.length; i++) {
+    ch = text[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (text[i + 1] === '"') { field += '"'; i++; }
+        else inQuotes = false;
+      } else field += ch;
+    } else if (ch === '"') inQuotes = true;
+    else if (ch === ",") { row.push(field); field = ""; }
+    else if (ch === "\r") { /* handled by \n */ }
+    else if (ch === "\n") { row.push(field); field = ""; rows.push(row); row = []; }
+    else field += ch;
+  }
+  if (field !== "" || row.length) { row.push(field); rows.push(row); }
+  return rows;
+}
+function findColumn(header, names) {
+  for (var i = 0; i < names.length; i++) if (header.indexOf(names[i]) >= 0) return names[i];
+  return null;
+}
+function cellsOf(header, row) {
+  var cells = {};
+  for (var i = 0; i < header.length; i++) cells[header[i]] = row[i].trim();
+  return cells;
+}
+function rowIsBlank(row) {
+  return row.length === 0 || row.every(function (c) { return c.trim() === ""; });
+}
+function F(macro, rule, severity, message) {
+  return { macro: macro, rule: rule, severity: severity, message: message };
+}
+function findingStr(f) {
+  return f.severity.toUpperCase() + " [" + f.rule + "] " + f.macro + ": " + f.message;
+}
+function validDate(y, mo, d) {
+  if (mo < 1 || mo > 12 || d < 1 || d > 31) return false;
+  var chk = new Date(Date.UTC(y, mo - 1, d));
+  return chk.getUTCFullYear() === y && chk.getUTCMonth() === mo - 1 && chk.getUTCDate() === d;
+}
+function makeTs(y, mo, d, hh, mi, ss, fracMs, offsetMin) {
+  var wallMs = Date.UTC(y, mo - 1, d, hh, mi, ss, fracMs);
+  return { ms: wallMs - offsetMin * 60000,
+    wall: { y: y, mo: mo, d: d, hh: hh, mi: mi } };
+}
+function fmtTsDate(t) {
+  function p2(n) { return (n < 10 ? "0" : "") + n; }
+  return t.wall.y + "-" + p2(t.wall.mo) + "-" + p2(t.wall.d);
+}
+function fmtTsDateTime(t) {
+  function p2(n) { return (n < 10 ? "0" : "") + n; }
+  return fmtTsDate(t) + " " + p2(t.wall.hh) + ":" + p2(t.wall.mi);
+}
+function tryIso(text) {
+  var m = /^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T ](\d{1,2}):(\d{2})(?::(\d{2})(?:\.(\d+))?)?\s*(Z|z|[+-]\d{2}:?\d{2}(?::?\d{2})?)?)?$/.exec(text);
+  if (!m) return null;
+  var y = +m[1], mo = +m[2], d = +m[3];
+  if (!validDate(y, mo, d)) return null;
+  var hh = m[4] !== undefined ? +m[4] : 0;
+  var mi = m[5] !== undefined ? +m[5] : 0;
+  var ss = m[6] !== undefined ? +m[6] : 0;
+  if (hh > 23 || mi > 59 || ss > 60) return null;
+  var fracMs = m[7] ? Math.floor(parseInt((m[7] + "000").slice(0, 3), 10)) : 0;
+  var offsetMin = 0;
+  if (m[8] && m[8] !== "Z" && m[8] !== "z") {
+    var om = /^([+-])(\d{2}):?(\d{2})/.exec(m[8]);
+    if (!om) return null;
+    offsetMin = ((+om[2]) * 60 + (+om[3])) * (om[1] === "-" ? -1 : 1);
+  }
+  return makeTs(y, mo, d, hh, mi, ss, fracMs, offsetMin);
+}
+function tryPattern(text, order, withTime) {
+  var m;
+  if (withTime) m = /^(\d{1,2})\/(\d{1,2})\/(\d{4}) (\d{1,2}):(\d{2})$/.exec(text);
+  else m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(text);
+  if (!m) return null;
+  var a = +m[1], b = +m[2], y = +m[3];
+  var d = order === "dmy" ? a : b;
+  var mo = order === "dmy" ? b : a;
+  if (!validDate(y, mo, d)) return null;
+  var hh = withTime ? +m[4] : 0, mi = withTime ? +m[5] : 0;
+  if (hh > 23 || mi > 59) return null;
+  return makeTs(y, mo, d, hh, mi, 0, 0, 0);
+}
+function parseTimestamp(text) {
+  if (text === null || text === undefined) return null;
+  var candidate = String(text).trim();
+  if (!candidate) return null;
+  if (/[Zz]$/.test(candidate)) candidate = candidate.slice(0, -1) + "+00:00";
+  var parsed = tryIso(candidate);
+  if (parsed) return parsed;
+  var attempts = [
+    function () { return tryPattern(candidate, "dmy", true); },
+    function () { return tryPattern(candidate, "mdy", true); },
+    function () { return tryPattern(candidate, "dmy", false); },
+    function () { return tryPattern(candidate, "mdy", false); }
+  ];
+  for (var i = 0; i < attempts.length; i++) {
+    parsed = attempts[i]();
+    if (parsed) return parsed;
+  }
+  return null;
+}
+function nowTs() {
+  var n = new Date();
+  return { ms: n.getTime(), wall: { y: n.getUTCFullYear(), mo: n.getUTCMonth() + 1,
+    d: n.getUTCDate(), hh: n.getUTCHours(), mi: n.getUTCMinutes() } };
+}
+function parseUseCount(text) {
+  if (text === null || text === undefined) return { value: null, valid: true };
+  var raw = String(text).trim().split(",").join("");
+  if (!raw) return { value: null, valid: true };
+  if (!/^[+-]?\d+$/.test(raw)) return { value: null, valid: false };
+  var count = parseInt(raw, 10);
+  if (count < 0) return { value: null, valid: false };
+  return { value: count, valid: true };
+}
+function normalizeTitle(title) {
+  return title.toLowerCase().replace(/[^a-z0-9]+/g, " ").split(/\s+/).filter(Boolean).join(" ");
+}
+function normalizeText(text) {
+  return text.toLowerCase().split(/\s+/).filter(Boolean).join(" ");
+}
+function parseActions(text) {
+  if (text === null || text === undefined) return [];
+  return text.split(";").map(function (s) { return s.trim(); }).filter(function (s) { return s !== ""; });
+}
+function actionKind(action) {
+  var lowered = action.toLowerCase();
+  if (lowered.indexOf("comment:") === 0 || lowered.indexOf("comment/description:") === 0) return "comment";
+  if (lowered.indexOf("description:") === 0) return "comment";
+  if (lowered.indexOf("set field:") === 0 || lowered.indexOf("set custom field:") === 0) return "field";
+  if (lowered.indexOf("add tag:") === 0) return "tag";
+  if (lowered.indexOf("assign to group:") === 0 || lowered.indexOf("assign group:") === 0) return "assign-group";
+  if (lowered.indexOf("assign to agent:") === 0 || lowered.indexOf("assign agent:") === 0) return "assign-agent";
+  return "other";
+}
+function actionValue(action) {
+  var idx = action.indexOf(":");
+  return idx >= 0 ? action.slice(idx + 1).trim() : "";
+}
+function loadPrices(text) {
+  var findings = [], prices = {};
+  var rows = parseCsvRows(text);
+  if (!rows.length) throw new Error("prices file is empty, no header row found");
+  var header = rows[0].map(function (n) { return n.trim(); });
+  var pCol = findColumn(header, ["product", "name", "plan"]);
+  if (pCol === null) throw new Error("prices file has no product column (header is: " + header.join(", ") + ")");
+  var priceCol = findColumn(header, ["price", "current_price", "amount"]);
+  if (priceCol === null) throw new Error("prices file has no price column (header is: " + header.join(", ") + ")");
+  for (var i = 1; i < rows.length; i++) {
+    var row = rows[i], lineNumber = i + 1;
+    if (rowIsBlank(row)) continue;
+    if (row.length !== header.length) {
+      findings.push(F("row " + lineNumber, "malformed-row", "error",
+        "prices row has " + row.length + " fields but the header has " + header.length + ", so the row was skipped"));
+      continue;
+    }
+    var cells = cellsOf(header, row);
+    var product = cells[pCol];
+    if (!product) {
+      findings.push(F("row " + lineNumber, "empty-product", "error",
+        "prices row has no product, so the row was skipped"));
+      continue;
+    }
+    var raw = cells[priceCol].split("$").join("").split(",").join("");
+    if (!raw) {
+      findings.push(F(product, "invalid-price", "error",
+        "price is empty, so the product was left out of the prices"));
+      continue;
+    }
+    var price = null, invalid = false;
+    try { price = Dec(raw); } catch (e) { invalid = true; }
+    if (invalid || decCmp(price, Dec(0)) < 0) {
+      findings.push(F(product, "invalid-price", "error",
+        "price " + pyRepr(cells[priceCol]) + " is not a valid non-negative number, so the product was left out of the prices"));
+      continue;
+    }
+    prices[product.toLowerCase()] = { product: product, price: price };
+  }
+  return { prices: prices, findings: findings };
+}
+function loadNames(text) {
+  var names = {};
+  String(text).split(/\r\n|\r|\n/).forEach(function (line) {
+    var stripped = line.replace(/^\uFEFF/, "").trim();
+    if (!stripped || stripped.charAt(0) === "#") return;
+    names[stripped.toLowerCase()] = true;
+  });
+  return names;
+}
+var INACTIVE = ["inactive", "disabled", "retired", "deleted", "archived"];
+function parseMacros(text, asOf) {
+  var findings = [], macros = [];
+  var rows = parseCsvRows(text);
+  if (!rows.length) throw new Error("input is empty, no header row found");
+  var header = rows[0].map(function (n) { return n.trim(); });
+  var idCol = findColumn(header, ["macro_id", "macro", "id"]);
+  if (idCol === null) throw new Error("input has no macro_id column (header is: " + header.join(", ") + ")");
+  var titleCol = findColumn(header, ["title", "name"]);
+  var categoryCol = findColumn(header, ["category", "group", "folder"]);
+  var actionsCol = findColumn(header, ["actions", "action"]);
+  var lastUsedCol = findColumn(header, ["last_used_at", "last_used", "last_used_date"]);
+  var useCountCol = findColumn(header, ["use_count", "uses", "usage_count", "times_used"]);
+  var statusCol = findColumn(header, ["status", "state"]);
+  var updatedCol = findColumn(header, ["updated_at", "updated", "updated_date"]);
+  var commentCol = findColumn(header, ["comment_text", "reply_text", "text", "comment", "body"]);
+  var seenIds = {};
+  for (var i = 1; i < rows.length; i++) {
+    var row = rows[i], lineNumber = i + 1;
+    if (rowIsBlank(row)) continue;
+    if (row.length !== header.length) {
+      findings.push(F("row " + lineNumber, "malformed-row", "error",
+        "row has " + row.length + " fields but the header has " + header.length + ", so the row was skipped"));
+      continue;
+    }
+    var cells = cellsOf(header, row);
+    var macroId = cells[idCol] || ("row " + lineNumber);
+    var title = titleCol ? cells[titleCol] : "";
+    if (!title) {
+      findings.push(F(macroId, "empty-title", "error", "row has no title, so the row was skipped"));
+      continue;
+    }
+    if (cells[idCol] && seenIds[cells[idCol]]) {
+      findings.push(F(macroId, "duplicate-macro-id", "error",
+        "macro id appears more than once in the export, so the macro was exported twice"));
+    } else if (cells[idCol]) seenIds[cells[idCol]] = true;
+    var record = { id: macroId, title: title,
+      category: categoryCol ? cells[categoryCol] : "",
+      actions: parseActions(actionsCol ? cells[actionsCol] : ""),
+      lastUsedAt: null, lastUsedEmpty: true, useCount: null,
+      status: statusCol ? cells[statusCol].toLowerCase() : "active",
+      updatedAt: null,
+      commentText: commentCol ? cells[commentCol] : "",
+      text: "", line: lineNumber };
+    [[lastUsedCol, "lastUsedAt", "last_used_at"], [updatedCol, "updatedAt", "updated_at"]].forEach(function (spec) {
+      var col = spec[0], key = spec[1], label = spec[2];
+      if (col === null) return;
+      var raw = cells[col];
+      if (!raw) return;
+      if (key === "lastUsedAt") record.lastUsedEmpty = false;
+      var parsed = parseTimestamp(raw);
+      if (parsed === null) {
+        findings.push(F(macroId, "invalid-timestamp", "error",
+          label + " " + pyRepr(raw) + " is not a readable date"));
+      } else {
+        record[key] = parsed;
+        if (parsed.ms > asOf.ms) {
+          findings.push(F(macroId, "future-timestamp", "error",
+            label + " " + fmtTsDateTime(parsed) + " is after the as-of date " + fmtTsDateTime(asOf)));
+        }
+      }
+    });
+    if (useCountCol !== null) {
+      var counted = parseUseCount(cells[useCountCol]);
+      if (!counted.valid) {
+        findings.push(F(macroId, "invalid-use-count", "error",
+          "use_count " + pyRepr(cells[useCountCol]) + " is not a valid non-negative whole number"));
+      } else record.useCount = counted.value;
+    }
+    if (record.commentText) record.text = record.commentText;
+    else {
+      record.text = record.actions.filter(function (a) { return actionKind(a) === "comment"; })
+        .map(actionValue).join(" ");
+    }
+    macros.push(record);
+  }
+  return { macros: macros, findings: findings };
+}
+function isUnused(macro, asOf, unusedDays) {
+  if (INACTIVE.indexOf(macro.status) >= 0) return false;
+  if (macro.lastUsedAt === null && macro.useCount === 0) return true;
+  if (macro.lastUsedAt !== null) return Math.floor((asOf.ms - macro.lastUsedAt.ms) / 86400000) > unusedDays;
+  return false;
+}
+function audit(macros, asOf, unusedDays, minUses, prices, deadDomains, deletedNames) {
+  var findings = [];
+  var seenTitles = {}, seenTexts = {};
+  var priceTol = Dec("0.01");
+  macros.forEach(function (macro) {
+    var macroId = macro.id;
+    var titleKey = normalizeTitle(macro.title);
+    if (Object.prototype.hasOwnProperty.call(seenTitles, titleKey)) {
+      findings.push(F(macroId, "duplicate-title", "error",
+        "title normalizes to " + pyRepr(titleKey) + ", the same as macro " + seenTitles[titleKey] +
+        ", so the two macros say the same thing"));
+    } else seenTitles[titleKey] = macroId;
+    var textKey = normalizeText(macro.text);
+    if (textKey) {
+      if (Object.prototype.hasOwnProperty.call(seenTexts, textKey)) {
+        findings.push(F(macroId, "duplicate-text", "error",
+          "reply text matches macro " + seenTexts[textKey] + ", so the two macros send the same reply"));
+      } else seenTexts[textKey] = macroId;
+    }
+    if (!macro.actions.length) {
+      findings.push(F(macroId, "no-actions", "error", "macro has no actions, so running it does nothing"));
+    } else {
+      var kinds = macro.actions.map(actionKind);
+      var missing = [];
+      if (kinds.indexOf("field") < 0) missing.push("a set field action");
+      if (kinds.indexOf("tag") < 0) missing.push("an add tag action");
+      if (missing.length) {
+        findings.push(F(macroId, "missing-reporting-actions", "warning",
+          "macro is missing " + missing.join(" and ") + ", so tickets it touches will not report accurately"));
+      }
+    }
+    if (!macro.category) {
+      findings.push(F(macroId, "no-category", "warning",
+        "macro has no category, so agents cannot find it by browsing"));
+    }
+    var inactive = INACTIVE.indexOf(macro.status) >= 0;
+    var lastUsed = macro.lastUsedAt, useCount = macro.useCount;
+    if (!inactive) {
+      if (lastUsed === null && useCount === 0) {
+        findings.push(F(macroId, "unused-macro", "error", "macro was never used"));
+      } else if (lastUsed !== null) {
+        var days = Math.floor((asOf.ms - lastUsed.ms) / 86400000);
+        if (days > unusedDays) {
+          findings.push(F(macroId, "unused-macro", "error",
+            "macro was last used " + fmtTsDate(lastUsed) + ", " + days + " days ago, past the " + unusedDays + "-day limit"));
+        }
+      }
+      if (useCount !== null && useCount > 0 && useCount < minUses) {
+        findings.push(F(macroId, "low-use-macro", "warning",
+          "macro was used only " + useCount + " times, below the minimum of " + minUses));
+      }
+    }
+    if (useCount !== null && useCount > 0 && lastUsed === null) {
+      findings.push(F(macroId, "missing-last-used", "warning",
+        "macro was used " + useCount + " times but has no last used date"));
+    }
+    var text = macro.text;
+    if (prices !== null && text) {
+      var lowered = text.toLowerCase();
+      Object.keys(prices).sort().forEach(function (productLower) {
+        if (lowered.indexOf(productLower) < 0) return;
+        var entry = prices[productLower];
+        var re = /\$(\d[\d,]*(?:\.\d{1,2})?)/g, match;
+        while ((match = re.exec(text)) !== null) {
+          var quoted = Dec(match[1].split(",").join(""));
+          var diff = decSub(quoted, entry.price);
+          if (diff.c < 0n) diff = { c: -diff.c, e: diff.e };
+          if (decCmp(diff, priceTol) > 0) {
+            findings.push(F(macroId, "stale-price", "error",
+              "text quotes " + entry.product + " at $" + fmt2(quoted) + " but the current price is $" + fmt2(entry.price)));
+            break;
+          }
+        }
+      });
+    }
+    if (deadDomains !== null && text) {
+      var urlRe = /https?:\/\/[^\s"'<>]+/g, umatch;
+      while ((umatch = urlRe.exec(text)) !== null) {
+        var url = umatch[0];
+        var rest = url.slice(url.indexOf("://") + 3);
+        var netloc = rest.split(/[/?#]/)[0].toLowerCase();
+        var host = netloc.split(":")[0];
+        if (host.indexOf(".") < 0) {
+          findings.push(F(macroId, "malformed-link", "warning",
+            "link " + url + " has no valid domain, so agents cannot open it"));
+          continue;
+        }
+        var dead = !!deadDomains[host] || Object.keys(deadDomains).some(function (domain) {
+          return host.endsWith("." + domain);
+        });
+        if (dead) {
+          findings.push(F(macroId, "dead-link", "error",
+            "link " + url + " points at " + host + ", a dead domain"));
+        }
+      }
+    }
+    if (deletedNames !== null) {
+      macro.actions.forEach(function (action) {
+        var kind = actionKind(action);
+        if (kind !== "assign-group" && kind !== "assign-agent") return;
+        var name = actionValue(action);
+        if (deletedNames[name.toLowerCase()]) {
+          findings.push(F(macroId, "deleted-reference", "error",
+            "macro assigns to " + (kind === "assign-group" ? "group" : "agent") + " " + pyRepr(name) + ", which no longer exists"));
+        }
+      });
+    }
+  });
+  return findings;
+}
+function padRight(s, w) { s = String(s); while (s.length < w) s += " "; return s; }
+function padLeft(s, w) { s = String(s); while (s.length < w) s = " " + s; return s; }
+window.runTool = function (inputText, options) {
+  options = options || {};
+  var unusedDays = options.unusedDays === undefined || options.unusedDays === "" ? 90 : parseInt(options.unusedDays, 10);
+  var minUses = options.minUses === undefined || options.minUses === "" ? 5 : parseInt(options.minUses, 10);
+  var asOf = (options.asOf === undefined || options.asOf === null || String(options.asOf).trim() === "")
+    ? nowTs() : parseTimestamp(String(options.asOf));
+  if (asOf === null) return "ERROR: --as-of " + pyRepr(options.asOf) + " is not a readable date\n";
+  var prices = null, priceFindings = [];
+  if (options.prices !== undefined && options.prices !== null) {
+    try {
+      var loaded = loadPrices(String(options.prices));
+      prices = loaded.prices; priceFindings = loaded.findings;
+    } catch (e) { return "ERROR: " + e.message + "\n"; }
+  }
+  var deadDomains = (options.deadDomains !== undefined && options.deadDomains !== null)
+    ? loadNames(String(options.deadDomains)) : null;
+  var deletedNames = (options.deleted !== undefined && options.deleted !== null)
+    ? loadNames(String(options.deleted)) : null;
+  var parsed;
+  try { parsed = parseMacros(inputText || "", asOf); }
+  catch (e) { return "ERROR: " + e.message + "\n"; }
+  var macros = parsed.macros;
+  var findings = parsed.findings.concat(priceFindings);
+  findings = findings.concat(audit(macros, asOf, unusedDays, minUses, prices, deadDomains, deletedNames));
+  var errors = findings.filter(function (f) { return f.severity === "error"; }).length;
+  var warnings = findings.length - errors;
+  var active = macros.filter(function (m) { return INACTIVE.indexOf(m.status) < 0; }).length;
+  var totalUses = 0;
+  macros.forEach(function (m) { if (m.useCount !== null) totalUses += m.useCount; });
+  var perCategory = {};
+  macros.forEach(function (macro) {
+    var category = macro.category || "(no category)";
+    var entry = perCategory[category] || (perCategory[category] = { category: category, macros: 0, uses: 0, unused: 0 });
+    entry.macros += 1;
+    if (macro.useCount !== null) entry.uses += macro.useCount;
+    if (isUnused(macro, asOf, unusedDays)) entry.unused += 1;
+  });
+  var catRows = Object.keys(perCategory).sort().map(function (k) { return perCategory[k]; });
+  var unusedTotal = catRows.reduce(function (s, e) { return s + e.unused; }, 0);
+  var dupTitles = findings.filter(function (f) { return f.rule === "duplicate-title"; }).length;
+  var dupTexts = findings.filter(function (f) { return f.rule === "duplicate-text"; }).length;
+  var noCategory = macros.filter(function (m) { return !m.category; }).length;
+  var lines = findings.map(findingStr);
+  lines.push("");
+  lines.push("Macros: " + macros.length + ", active: " + active + ", inactive: " + (macros.length - active) +
+    ", findings: " + findings.length + ", errors: " + errors + ", warnings: " + warnings);
+  lines.push("Total uses: " + totalUses + ", unused macros: " + unusedTotal +
+    ", duplicate titles: " + dupTitles + ", duplicate reply texts: " + dupTexts +
+    ", macros with no category: " + noCategory);
+  lines.push("");
+  lines.push("Per-category summary:");
+  lines.push(padRight("category", 16) + " " + padLeft("macros", 6) + " " + padLeft("uses", 8) + " " + padLeft("unused", 6));
+  catRows.forEach(function (entry) {
+    lines.push(padRight(entry.category, 16) + " " + padLeft(entry.macros, 6) + " " +
+      padLeft(entry.uses, 8) + " " + padLeft(entry.unused, 6));
+  });
+  if (findings.length === 0) { lines.push(""); lines.push("All macros clean."); }
+  return lines.join("\n") + "\n";
+};
+</script>
+<script>
+var SAMPLE = `macro_id,title,category,actions,last_used_at,use_count,status,updated_at,comment_text
+M-101,Reset password help,Account,comment: Follow the steps below to reset your password; set field: issue_type=password_reset; add tag: password_reset,2026-11-10,42,active,2026-11-01,Follow the steps below to reset your password at https://help.example.com/reset-password
+M-102,Reset Password Help,Account,comment: Follow the steps below to reset your password; set field: issue_type=password_reset; add tag: password_reset,2026-11-12,38,active,2026-11-02,Follow the steps below to reset your password at https://help.example.com/reset-password
+M-103,Refund request,Billing,comment: We can refund your order within 5 business days; set field: issue_type=refund,2026-08-01,12,active,2026-08-01,We can refund your order within 5 business days
+M-104,Pro plan price question,Billing,comment: Our Pro plan is $29 per month; set field: issue_type=pricing; add tag: pricing,2026-11-15,25,active,2026-11-01,"Our Pro plan is $29 per month, billed monthly"
+M-105,Old help center link,General,comment: See the guide at https://old-help.example.com/guide for details; set field: issue_type=general; add tag: help,2026-11-14,8,active,2026-11-03,See the guide at https://old-help.example.com/guide for details
+M-106,Empty macro,General,,2026-11-16,3,active,2026-11-04,
+M-107,Assign to old team,Support,comment: Escalating this to the legacy team; assign to group: Legacy Support; set field: issue_type=escalation; add tag: escalation,2026-11-17,15,active,2026-11-05,Escalating this to the legacy team
+M-108,No category macro,,comment: Thanks for reaching out; set field: issue_type=general; add tag: thanks,2026-11-13,20,active,2026-11-06,Thanks for reaching out
+M-109,Refund status check,Billing,comment: We can refund your order within 5 business days; set field: issue_type=refund; add tag: refund,2026-11-11,30,active,2026-11-07,We can refund your order within 5 business days
+M-110,Welcome new user,Onboarding,comment: Welcome aboard; set field: issue_type=onboarding; add tag: welcome,2026-11-09,55,active,2026-11-08,"Welcome aboard, thanks for joining us"
+M-111,VPN setup guide,Technical,comment: Install the VPN client from the link; add tag: vpn,2026-11-05,4,active,2026-11-09,Install the VPN client from the link below
+M-112,Broken link macro,General,comment: See the guide at https://help for details; set field: issue_type=general; add tag: help,2026-11-14,6,active,2026-11-10,See the guide at https://help for details
+M-113,Retired macro,Account,comment: Old password flow; set field: issue_type=password_reset; add tag: password_reset,2026-01-15,0,inactive,2026-01-15,"Old password flow, do not use"
+M-114,Never used macro,General,comment: A new macro nobody used yet; set field: issue_type=general; add tag: new,,0,active,2026-11-11,A new macro nobody used yet
+M-115,Future use macro,Technical,comment: Updated for the new release; set field: issue_type=general; add tag: release,2026-12-01,5,active,2026-11-12,Updated for the new release
+M-101,Reset password help,Account,comment: Follow the steps below to reset your password; set field: issue_type=password_reset; add tag: password_reset,2026-11-12,38,active,2026-11-02,Follow the steps below to reset your password at https://help.example.com/reset-password
+M-117,Bad count macro,General,comment: Something; set field: issue_type=general; add tag: x,2026-11-16,many,active,2026-11-13,Something
+M-118,Bad date macro,General,comment: Something else; set field: issue_type=general; add tag: x,not-a-date,7,active,2026-11-14,Something else
+M-119,BADROW,111
+M-120,Check order status,Orders,comment: Your order is on its way; set field: issue_type=order_status; add tag: order_status,2026-11-18,60,active,2026-11-15,"Your order is on its way, tracking to follow"
+M-121,Assign to departed agent,Support,comment: Passing this to Dana; assign to agent: Dana Cole; set field: issue_type=escalation; add tag: escalation,2026-11-16,9,active,2026-11-16,Passing this to Dana for a closer look
+M-122,Refund-Request!,Billing,comment: A refund takes 5 business days; set field: issue_type=refund; add tag: refund,2026-11-10,11,active,2026-11-17,A refund takes 5 business days to reach your account
+M-123,Basic plan price question,Billing,comment: Our Basic plan is $19 per month; set field: issue_type=pricing; add tag: pricing,2026-11-15,22,active,2026-11-18,"Our Basic plan is $19 per month, billed monthly"
+M-124,Shipping delay apology,Orders,comment: Sorry for the delay; add tag: shipping,2026-10-20,2,active,2026-10-20,Sorry for the delay with your order
+M-125,Missing last used,General,comment: Follow up on your ticket; set field: issue_type=general; add tag: followup,,9,active,2026-11-18,Follow up on your ticket soon
+M-126,,General,comment: No title here; set field: issue_type=general; add tag: x,2026-11-16,1,active,2026-11-18,No title here
+`;
+var SAMPLE_PRICES = `product,price
+Pro plan,39.00
+Basic plan,24.00
+`;
+var SAMPLE_DELETED = `# Groups and agents deleted from Zendesk
+Legacy Support
+Dana Cole
+`;
+var SAMPLE_DEAD = `# Domains that no longer serve help content
+old-help.example.com
+legacy.example.com
+`;
+var inputEl = document.getElementById("input");
+var pricesEl = document.getElementById("prices");
+var deletedEl = document.getElementById("deleted");
+var deadEl = document.getElementById("dead");
+var outEl = document.getElementById("out");
+var lastReport = "";
+function readFileInto(el, input) {
+  input.addEventListener("change", function (ev) {
+    var f = ev.target.files && ev.target.files[0];
+    if (!f) return;
+    var reader = new FileReader();
+    reader.onload = function () { el.value = String(reader.result || ""); };
+    reader.readAsText(f);
+  });
+}
+readFileInto(inputEl, document.getElementById("file"));
+readFileInto(pricesEl, document.getElementById("prices-file"));
+readFileInto(deletedEl, document.getElementById("deleted-file"));
+readFileInto(deadEl, document.getElementById("dead-file"));
+document.getElementById("sample").addEventListener("click", function () {
+  inputEl.value = SAMPLE;
+  pricesEl.value = SAMPLE_PRICES;
+  deletedEl.value = SAMPLE_DELETED;
+  deadEl.value = SAMPLE_DEAD;
+});
+document.getElementById("run").addEventListener("click", function () {
+  var options = {
+    unusedDays: document.getElementById("opt-unused").value,
+    minUses: document.getElementById("opt-minuses").value,
+    asOf: document.getElementById("opt-asof").value,
+    prices: pricesEl.value.trim() === "" ? null : pricesEl.value,
+    deleted: deletedEl.value.trim() === "" ? null : deletedEl.value,
+    deadDomains: deadEl.value.trim() === "" ? null : deadEl.value
+  };
+  try {
+    lastReport = window.runTool(inputEl.value, options);
+    outEl.textContent = lastReport;
+  } catch (e) {
+    lastReport = "ERROR: " + e.message + "\n";
+    outEl.textContent = lastReport;
+  }
+});
+document.getElementById("download").addEventListener("click", function () {
+  var text = lastReport || outEl.textContent;
+  var blob = new Blob([text], { type: "text/plain" });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement("a");
+  a.href = url;
+  a.download = "zendesk-macro-report.txt";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+</script>
+</body>
+</html>
